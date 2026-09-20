@@ -5,6 +5,9 @@
   const ITERATIONS = 600000;
   const SALT_BYTES = 16;
   const IV_BYTES = 12;
+  const STORED_TOKEN_KEY = "task-github-token-secure-v1";
+  const SESSION_TOKEN_KEY = "task-github-token-v1";
+  const TOKEN_AAD = "task-manager-github-pat-v1";
   const encoder = new TextEncoder();
   const decoder = new TextDecoder("utf-8");
 
@@ -106,6 +109,95 @@
       iv: bytesToBase64(iv),
       ciphertext: bytesToBase64(new Uint8Array(encrypted))
     };
+  }
+
+  async function rememberGitToken(token) {
+    const value = String(token || "").trim();
+    if (!value) {
+      localStorage.removeItem(STORED_TOKEN_KEY);
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      const input = document.getElementById("gitToken");
+      if (input) input.value = "";
+      return "";
+    }
+    if (!passwordInMemory) {
+      throw new Error("PATを保存するにはパスワードでロックを解除してください");
+    }
+
+    const salt = randomBytes(SALT_BYTES);
+    const iv = randomBytes(IV_BYTES);
+    const key = await deriveKey(passwordInMemory, salt, ITERATIONS);
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData: encoder.encode(TOKEN_AAD) },
+      key,
+      encoder.encode(value)
+    );
+    const envelope = {
+      version: 1,
+      encrypted: true,
+      algorithm: "AES-256-GCM",
+      kdf: {
+        name: "PBKDF2",
+        hash: "SHA-256",
+        iterations: ITERATIONS,
+        salt: bytesToBase64(salt)
+      },
+      iv: bytesToBase64(iv),
+      ciphertext: bytesToBase64(new Uint8Array(encrypted))
+    };
+    localStorage.setItem(STORED_TOKEN_KEY, JSON.stringify(envelope));
+    sessionStorage.setItem(SESSION_TOKEN_KEY, value);
+    const input = document.getElementById("gitToken");
+    if (input) input.value = value;
+    return value;
+  }
+
+  async function restoreGitToken() {
+    if (!passwordInMemory) return "";
+    const raw = localStorage.getItem(STORED_TOKEN_KEY);
+    if (!raw) {
+      const legacySessionToken = sessionStorage.getItem(SESSION_TOKEN_KEY) || "";
+      if (legacySessionToken) {
+        try { await rememberGitToken(legacySessionToken); } catch (_) {}
+      }
+      return legacySessionToken;
+    }
+
+    try {
+      const envelope = JSON.parse(raw);
+      if (!envelope?.encrypted || !envelope?.kdf?.salt || !envelope?.iv || !envelope?.ciphertext) {
+        throw new Error("保存済みPATの形式が正しくありません");
+      }
+      const salt = base64ToBytes(envelope.kdf.salt);
+      const iv = base64ToBytes(envelope.iv);
+      const iterations = Number(envelope.kdf.iterations) || ITERATIONS;
+      const key = await deriveKey(passwordInMemory, salt, iterations);
+      const plain = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv, additionalData: encoder.encode(TOKEN_AAD) },
+        key,
+        base64ToBytes(envelope.ciphertext)
+      );
+      const token = decoder.decode(plain).trim();
+      if (!token) throw new Error("保存済みPATが空です");
+      sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+      const input = document.getElementById("gitToken");
+      if (input) input.value = token;
+      return token;
+    } catch (error) {
+      console.warn("Stored GitHub PAT could not be decrypted", error);
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      window.dispatchEvent(new CustomEvent("git-sync-status", {
+        detail: {
+          status: "error",
+          message: "保存済みPATを復号できませんでした。Git同期欄からPATを再入力してください。"
+        }
+      }));
+      return "";
+    }
+  }
+
+  function hasRememberedGitToken() {
+    return Boolean(localStorage.getItem(STORED_TOKEN_KEY));
   }
 
   function inferRepo() {
@@ -267,6 +359,7 @@
         passwordInMemory = candidate;
         try {
           await decryptEnvelope(envelope);
+          await restoreGitToken();
           openApp();
           setMessage("");
           resolve(true);
@@ -310,6 +403,7 @@
           };
           const initialEnvelope = await encryptPayload(initialPayload);
           await persistInitialEnvelope(initialEnvelope, token);
+          await rememberGitToken(token);
           openApp();
           setMessage("");
           resolve(true);
@@ -326,6 +420,7 @@
     passwordInMemory = "";
     preferredSalt = null;
     unlocked = false;
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
     if (reload) location.reload();
   }
 
@@ -335,6 +430,9 @@
     encryptPayload,
     isUnlocked: () => unlocked,
     isSetupMode: () => setupMode,
+    rememberGitToken,
+    restoreGitToken,
+    hasRememberedGitToken,
     lock
   };
 })();

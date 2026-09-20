@@ -388,14 +388,29 @@
       collectSettings();
       if (els.autoSave.checked) api.scheduleSave();
     });
-    els.token.addEventListener("change", () => {
+    els.token.addEventListener("change", async () => {
       api.setToken(els.token.value);
-      show("pending", els.token.value.trim() ? "トークンをこのセッションに設定しました" : "トークンを解除しました");
+      try {
+        if (window.TaskSecurity?.rememberGitToken) {
+          await window.TaskSecurity.rememberGitToken(els.token.value);
+        }
+        show(
+          "pending",
+          els.token.value.trim()
+            ? "PATをこのブラウザへ暗号化して保存しました"
+            : "保存済みPATを削除しました"
+        );
+      } catch (error) {
+        show("error", error.message || "PATを保存できませんでした");
+      }
     });
 
     els.test.addEventListener("click", async () => {
       collectSettings();
       api.setToken(els.token.value);
+      if (window.TaskSecurity?.rememberGitToken && els.token.value.trim()) {
+        await window.TaskSecurity.rememberGitToken(els.token.value);
+      }
       show("loading", "接続を確認しています…");
       try {
         await api.testConnection();
@@ -407,6 +422,9 @@
     els.pull.addEventListener("click", async () => {
       collectSettings();
       api.setToken(els.token.value);
+      if (window.TaskSecurity?.rememberGitToken && els.token.value.trim()) {
+        await window.TaskSecurity.rememberGitToken(els.token.value);
+      }
       if (!confirm("Git上のデータでこのブラウザのデータを更新します。続けますか？")) return;
       show("loading", "Gitからデータを読み込んでいます…");
       try {
@@ -419,6 +437,9 @@
     els.push.addEventListener("click", async () => {
       collectSettings();
       api.setToken(els.token.value);
+      if (window.TaskSecurity?.rememberGitToken && els.token.value.trim()) {
+        await window.TaskSecurity.rememberGitToken(els.token.value);
+      }
       show("saving", "Gitへ保存しています…");
       try {
         await api.saveNow({ force: true });

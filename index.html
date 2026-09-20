@@ -247,6 +247,7 @@
 <span>内容を確認してから反映します</span>
 </div>
 </div>
+<div class="csv-settings-grid">
 <section class="git-sync-panel" aria-label="Git同期設定">
 <div class="git-sync-head"><div><strong>Git同期</strong><span>更新データをリポジトリの data/app-state.enc.json に暗号化して保存</span></div><span class="git-sync-status" id="gitSyncStatus">未接続</span></div>
 <div class="git-sync-grid">
@@ -255,7 +256,7 @@
 <div class="field"><label for="gitBranch">Branch</label><input class="input" id="gitBranch" type="text" value="main"/></div>
 <div class="field"><label for="gitDataPath">Data path</label><input class="input" id="gitDataPath" type="text" value="data/app-state.enc.json"/></div>
 </div>
-<div class="field"><label for="gitToken">Fine-grained PAT</label><input class="input" id="gitToken" type="password" autocomplete="off" placeholder="Contents: Read and write のトークン"/><span class="field-help">トークンは sessionStorage のみに保持し、GitやlocalStorageには保存しません。</span></div>
+<div class="field"><label for="gitToken">Fine-grained PAT</label><input class="input" id="gitToken" type="password" autocomplete="off" placeholder="Contents: Read and write のトークン"/><span class="field-help">PATはサイトパスワードで暗号化してこのブラウザに保存します。次回以降はパスワード入力だけでGit同期できます。</span></div>
 <div class="git-sync-actions">
 <label class="git-auto-save"><input id="gitAutoSave" type="checkbox" checked/><span>更新時に自動でGitへ保存</span></label>
 <button class="btn" id="gitTestBtn" type="button">接続確認</button>
@@ -264,7 +265,7 @@
 </div>
 <div class="git-sync-message" id="gitSyncMessage"></div>
 </section>
-<form class="csv-import-form csv-import-form--split" id="csvImportForm">
+<form class="csv-import-form csv-import-form--side" id="csvImportForm">
 <div class="field csv-type-field">
 <label for="csvImportType">データ種別</label>
 <select class="select" id="csvImportType">
@@ -277,7 +278,6 @@
 <option value="recurring">毎月繰り返し支出</option>
 </select>
 </div>
-<div class="csv-import-right">
 <div class="field csv-file-field">
 <label for="csvImportFile">CSVファイル</label>
 <input accept=".csv,text/csv" class="input" id="csvImportFile" required="" type="file"/>
@@ -288,8 +288,8 @@
 <span>休日・企画タスク・予定・やりたいこと・家計簿を1ファイルにまとめます。</span>
 </div>
 <div aria-live="polite" class="csv-import-result" id="csvImportResult"></div>
-</div>
 </form>
+</div>
 </section>
 <aside aria-hidden="true" aria-labelledby="csvPreviewTitle" class="csv-preview-modal" id="csvPreviewModal">
 <section class="csv-preview-dialog" role="region">
