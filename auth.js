@@ -129,6 +129,60 @@
     return `https://raw.githubusercontent.com/${encodeURIComponent(info.owner)}/${encodeURIComponent(info.repo)}/${encodeURIComponent(info.branch)}/${info.dataPath.split("/").map(encodeURIComponent).join("/")}`;
   }
 
+  function apiUrl(info) {
+    return `https://api.github.com/repos/${encodeURIComponent(info.owner)}/${encodeURIComponent(info.repo)}/contents/${info.dataPath.split("/").map(encodeURIComponent).join("/")}`;
+  }
+
+  function gitHeaders(token) {
+    return {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json"
+    };
+  }
+
+  async function persistInitialEnvelope(envelope, token) {
+    const repo = inferRepo();
+    if (!repo.owner || !repo.repo) {
+      throw new Error("GitHubのOwner / Repositoryを特定できません。git-config.jsを設定してください");
+    }
+    if (!token) throw new Error("初回設定にはGitHub PATが必要です");
+
+    let sha = "";
+    const getResponse = await fetch(`${apiUrl(repo)}?ref=${encodeURIComponent(repo.branch)}`, {
+      headers: gitHeaders(token),
+      cache: "no-store"
+    });
+    if (getResponse.ok) {
+      const current = await getResponse.json();
+      sha = String(current.sha || "");
+    } else if (getResponse.status !== 404) {
+      throw new Error(`GitHubへ接続できません（${getResponse.status}）`);
+    }
+
+    const body = {
+      message: "Initialize encrypted task data",
+      content: bytesToBase64(encoder.encode(`${JSON.stringify(envelope, null, 2)}\n`)),
+      branch: repo.branch
+    };
+    if (sha) body.sha = sha;
+
+    const putResponse = await fetch(apiUrl(repo), {
+      method: "PUT",
+      headers: gitHeaders(token),
+      body: JSON.stringify(body)
+    });
+    if (!putResponse.ok) {
+      const info = await putResponse.json().catch(() => ({}));
+      throw new Error(info.message || `GitHubへの初期保存に失敗しました（${putResponse.status}）`);
+    }
+    sessionStorage.setItem("task-github-token-v1", token);
+    const gitTokenInput = document.getElementById("gitToken");
+    if (gitTokenInput) gitTokenInput.value = token;
+    return true;
+  }
+
   async function fetchBootstrapEnvelope() {
     const repo = inferRepo();
     if (repo.owner && repo.repo) {
@@ -158,6 +212,7 @@
       setupForm: document.getElementById("authSetupForm"),
       newPassword: document.getElementById("authNewPassword"),
       confirmPassword: document.getElementById("authNewPasswordConfirm"),
+      setupToken: document.getElementById("authSetupToken"),
       message: document.getElementById("authMessage")
     };
   }
@@ -180,7 +235,7 @@
     setupMode = true;
     const els = ui();
     els.title.textContent = "初回パスワード設定";
-    els.description.textContent = "このパスワードから暗号鍵を作成します。パスワードそのものはGitへ保存されません。";
+    els.description.textContent = "初回だけ、パスワードとGitHub PATを使って暗号化設定をGitへ保存します。保存に成功するまでアプリは開きません。";
     els.unlockForm.hidden = true;
     els.setupForm.hidden = false;
     setTimeout(() => els.newPassword?.focus(), 0);
@@ -234,15 +289,33 @@
           setMessage("確認用パスワードが一致しません", true);
           return;
         }
+        const token = String(els.setupToken?.value || "").trim();
+        if (!token) {
+          setMessage("初回設定にはGitHub PATを入力してください", true);
+          return;
+        }
         passwordInMemory = a;
         preferredSalt = randomBytes(SALT_BYTES);
         try {
-          await encryptPayload({ schemaVersion: 1, updatedAt: new Date().toISOString(), appState: null, timerState: null });
+          setMessage("暗号化した初期設定をGitへ保存しています…");
+          let localAppState = null;
+          let localTimerState = null;
+          try { localAppState = JSON.parse(localStorage.getItem("task-calendar-ui-v1") || "null"); } catch (_) {}
+          try { localTimerState = JSON.parse(localStorage.getItem("task-work-timer-pomodoro-v2") || "null"); } catch (_) {}
+          const initialPayload = {
+            schemaVersion: 1,
+            updatedAt: new Date().toISOString(),
+            appState: localAppState,
+            timerState: localTimerState
+          };
+          const initialEnvelope = await encryptPayload(initialPayload);
+          await persistInitialEnvelope(initialEnvelope, token);
           openApp();
           setMessage("");
           resolve(true);
         } catch (error) {
           passwordInMemory = "";
+          preferredSalt = null;
           setMessage(error.message || "初期設定に失敗しました", true);
         }
       }, { once: false });

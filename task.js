@@ -162,6 +162,7 @@
   let editingProjectId = null;
   let priorityFilter = "all";
   let activeTab = "calendar";
+  let scheduleInitialAligned = false;
   let toastTimer = null;
   let pendingCsvImport = null;
   const selectedWishlistIds = new Set();
@@ -264,7 +265,7 @@
   });
 
   if (els.scheduleTodayBtn) {
-    els.scheduleTodayBtn.addEventListener("click", scrollScheduleToToday);
+    els.scheduleTodayBtn.addEventListener("click", () => scrollScheduleToToday("smooth"));
   }
 
   els.iphoneCalendarSync.addEventListener("click", exportIphoneCalendar);
@@ -739,6 +740,12 @@
 
     if (nextTab === "schedule") {
       renderSchedule();
+      if (!scheduleInitialAligned) {
+        scheduleInitialAligned = true;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => scrollScheduleToToday("auto"));
+        });
+      }
     }
     if (nextTab === "wishlist") {
       renderWishlist();
@@ -2076,7 +2083,7 @@
       .replace(/;/g, "\\;");
   }
 
-  function scrollScheduleToToday() {
+  function scrollScheduleToToday(behavior = "smooth") {
     const todayKey = toDateKey(today);
     if (today < SCHEDULE_START || today > SCHEDULE_END) {
       showToast("今日の日付は企画タスク一覧の表示期間外です");
@@ -2084,7 +2091,12 @@
     }
     const row = els.scheduleTableBody.querySelector(`[data-schedule-date="${todayKey}"]`);
     if (!row) return;
-    row.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    if (els.scheduleTableWrap) {
+      const top = Math.max(0, row.offsetTop - (els.scheduleTableWrap.clientHeight / 2) + (row.offsetHeight / 2));
+      els.scheduleTableWrap.scrollTo({ top, behavior });
+    } else {
+      row.scrollIntoView({ behavior, block: "center", inline: "nearest" });
+    }
   }
 
   function normalizeMoney(value) {

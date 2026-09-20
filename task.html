@@ -37,13 +37,22 @@
         <label for="authNewPasswordConfirm">パスワード確認</label>
         <input class="input auth-password-input" id="authNewPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required/>
       </div>
-      <button class="btn btn-primary auth-submit" type="submit">初期設定して開く</button>
+      <div class="field">
+        <label for="authSetupToken">GitHub PAT（初回設定のみ）</label>
+        <input class="input auth-password-input" id="authSetupToken" type="password" autocomplete="off" required placeholder="Contents: Read and write"/>
+        <span class="field-help">暗号化した初期設定をGitへ保存できた場合だけアプリを開きます。PATはこのセッション内だけ保持します。</span>
+      </div>
+      <button class="btn btn-primary auth-submit" type="submit">パスワードを設定してGitへ保存</button>
     </form>
     <p class="auth-message" id="authMessage"></p>
   </section>
 </div>
 <div class="app">
 <nav aria-label="タスク管理表示切り替え" class="page-tabs" role="tablist">
+<button class="utility-square-button page-menu-memo-button" id="todayMemoToggle" type="button" aria-controls="todayMemoPanel" aria-expanded="false" title="今日やることメモ">
+<span aria-hidden="true">📝</span>
+<span class="sr-only">今日やることメモ</span>
+</button>
 <button aria-controls="panelCalendar" aria-selected="true" class="page-tab is-active" data-page-tab="calendar" id="tabCalendar" role="tab" type="button">
 <span class="page-tab-label">タスク・カレンダー</span>
 </button>
@@ -255,8 +264,8 @@
 </div>
 <div class="git-sync-message" id="gitSyncMessage"></div>
 </section>
-<form class="csv-import-form" id="csvImportForm">
-<div class="field">
+<form class="csv-import-form csv-import-form--split" id="csvImportForm">
+<div class="field csv-type-field">
 <label for="csvImportType">データ種別</label>
 <select class="select" id="csvImportType">
 <option value="all">全データ一括</option>
@@ -268,17 +277,19 @@
 <option value="recurring">毎月繰り返し支出</option>
 </select>
 </div>
+<div class="csv-import-right">
 <div class="field csv-file-field">
 <label for="csvImportFile">CSVファイル</label>
 <input accept=".csv,text/csv" class="input" id="csvImportFile" required="" type="file"/>
 </div>
 <button class="btn btn-primary" type="submit">内容を確認</button>
-</form>
 <div class="csv-bulk-actions">
 <button class="btn csv-export-all" id="csvExportAll" type="button">全データCSVを書き出す</button>
 <span>休日・企画タスク・予定・やりたいこと・家計簿を1ファイルにまとめます。</span>
 </div>
 <div aria-live="polite" class="csv-import-result" id="csvImportResult"></div>
+</div>
+</form>
 </section>
 <aside aria-hidden="true" aria-labelledby="csvPreviewTitle" class="csv-preview-modal" id="csvPreviewModal">
 <section class="csv-preview-dialog" role="region">
@@ -385,12 +396,6 @@
 </section>
 </div>
 
-<aside class="utility-rail" aria-label="クイックメニュー">
-  <button class="utility-square-button" id="todayMemoToggle" type="button" aria-controls="todayMemoPanel" aria-expanded="false" title="今日やることメモ">
-    <span aria-hidden="true">📝</span>
-    <span class="sr-only">今日やることメモ</span>
-  </button>
-</aside>
 <section class="today-memo-panel" id="todayMemoPanel" aria-hidden="true" aria-labelledby="todayMemoHeading">
   <div class="today-memo-head">
     <div>
