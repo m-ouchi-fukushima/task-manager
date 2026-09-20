@@ -1,0 +1,4 @@
+{
+  "deprecated": true,
+  "message": "Plaintext storage disabled. Use app-state.enc.json."
+}
